@@ -4,7 +4,7 @@
 
 > Fork of [koreader/koreader-sync-server](https://github.com/koreader/koreader-sync-server)
 > with an admin dashboard, security hardening, and operational improvements.
-> Built with AI assistance using [Claude Code](https://claude.ai/claude-code).
+> Built with AI assistance.
 
 A self-hosted reading progress sync server for [KOReader](https://koreader.rocks/)
 devices. Built on [OpenResty](https://openresty.org/) (nginx + Lua) with Redis
