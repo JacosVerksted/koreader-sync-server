@@ -7,7 +7,7 @@ services:
       - 7200:7200
     environment:
       - ENABLE_USER_REGISTRATION=true
-      - ADMIN_PASSWORD=change-me
+      # - ADMIN_PASSWORD=your-secret-here
     volumes:
       - /mnt/cache/appdata/koreader-sync-server/test/logs/app:/app/koreader-sync-server/logs
       - /mnt/cache/appdata/koreader-sync-server/test/logs/redis:/var/log/redis

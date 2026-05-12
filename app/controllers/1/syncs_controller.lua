@@ -209,16 +209,6 @@ end
 
 -- ── Healthcheck helpers ──────────────────────────────────────────────────
 
-local function parse_redis_info(info_str)
-    local t = {}
-    if type(info_str) ~= "string" then return t end
-    for line in info_str:gmatch("[^\r\n]+") do
-        local k, v = line:match("^([^#][^:]*):(.+)$")
-        if k then t[k] = v end
-    end
-    return t
-end
-
 local function check_writable(path)
     local f = io.open(path .. "/.healthcheck_test", "w")
     if f then
@@ -227,14 +217,6 @@ local function check_writable(path)
         return true
     end
     return false
-end
-
-local function fmt_uptime(seconds)
-    local s = tonumber(seconds) or 0
-    if s < 60 then return s .. "s" end
-    if s < 3600 then return math.floor(s/60) .. "m" end
-    if s < 86400 then return math.floor(s/3600) .. "h " .. math.floor((s%3600)/60) .. "m" end
-    return math.floor(s/86400) .. "d " .. math.floor((s%86400)/3600) .. "h"
 end
 
 local function esc_h(s)
@@ -332,19 +314,6 @@ function SyncsController:healthcheck()
     end
     checks[#checks+1] = { check = true, ok = ping_ok, name = "Redis PING", detail = ping_ok and "OK" or "failed" }
     if not ping_ok then all_ok = false end
-
-    -- Redis info (non-check, informational)
-    local mem_info, srv_info = {}, {}
-    if redis and ping_ok then
-        mem_info = parse_redis_info(redis:info("memory"))
-        srv_info = parse_redis_info(redis:info("server"))
-        local dbsize = redis:dbsize()
-
-        checks[#checks+1] = { check = false, name = "Redis memory", detail = mem_info.used_memory_human or "?" }
-        checks[#checks+1] = { check = false, name = "Redis keys", detail = tostring(dbsize or "?") }
-        checks[#checks+1] = { check = false, name = "Redis uptime", detail = fmt_uptime(srv_info.uptime_in_seconds) }
-        checks[#checks+1] = { check = false, name = "Redis version", detail = srv_info.redis_version or "?" }
-    end
 
     -- Log directory
     local log_ok = check_writable("/app/koreader-sync-server/logs")
