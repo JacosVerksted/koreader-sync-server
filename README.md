@@ -1,6 +1,6 @@
 [![AGPL Licence][licence-badge]](COPYING)
 
-# KOReader Sync Server
+# KOReader Sync Server Dashboard
 
 > Fork of [koreader/koreader-sync-server](https://github.com/koreader/koreader-sync-server)
 > with an admin dashboard, security hardening, and operational improvements.
