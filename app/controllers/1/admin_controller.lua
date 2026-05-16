@@ -7,11 +7,23 @@ local AdminController = {}
 -- ── Auth ─────────────────────────────────────────────────────────────────
 
 local COOKIE_NAME = "kos_admin"
+local MAX_ATTEMPTS = 5
+local LOCKOUT_SECONDS = 300  -- 5 minutes
+
+local function admin_username()
+    local u = os.getenv("ADMIN_USERNAME")
+    if u and u ~= "" then return u end
+    return nil
+end
 
 local function admin_password()
     local p = os.getenv("ADMIN_PASSWORD")
     if p and p ~= "" then return p end
     return nil
+end
+
+local function admin_enabled()
+    return admin_username() and admin_password()
 end
 
 local function cookie_token(password)
@@ -20,9 +32,8 @@ local function cookie_token(password)
 end
 
 local function is_authenticated()
-    local pwd = admin_password()
-    if not pwd then return false end
-    return ngx.var["cookie_" .. COOKIE_NAME] == cookie_token(pwd)
+    if not admin_enabled() then return false end
+    return ngx.var["cookie_" .. COOKIE_NAME] == cookie_token(admin_password())
 end
 
 local function set_auth_cookie(password)
@@ -32,6 +43,31 @@ end
 
 local function clear_auth_cookie()
     ngx.header["Set-Cookie"] = COOKIE_NAME .. "=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0"
+end
+
+local function lockout_key(ip)
+    return "admin_lockout:" .. ip
+end
+
+local function is_locked_out(redis, ip)
+    if not redis then return false end
+    local attempts = redis:get(lockout_key(ip))
+    if attempts and attempts ~= ngx.null then
+        return tonumber(attempts) >= MAX_ATTEMPTS
+    end
+    return false
+end
+
+local function record_failed_attempt(redis, ip)
+    if not redis then return end
+    local key = lockout_key(ip)
+    redis:incr(key)
+    redis:expire(key, LOCKOUT_SECONDS)
+end
+
+local function clear_failed_attempts(redis, ip)
+    if not redis then return end
+    redis:del(lockout_key(ip))
 end
 
 -- ── Helpers ──────────────────────────────────────────────────────────────
@@ -191,8 +227,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 .login-card h1{font-size:1.2rem;color:#a78bfa;margin-bottom:.3rem}
 .login-card .sub{font-size:.82rem;color:#555;margin-bottom:2rem}
 label{display:block;font-size:.8rem;color:#888;margin-bottom:.4rem}
-input[type=password]{width:100%;background:#0d0d1a;border:1px solid #252550;border-radius:6px;padding:.65rem .9rem;color:#ddd;font-size:.9rem;outline:none;transition:border-color .15s}
-input[type=password]:focus{border-color:#a78bfa}
+input[type=password],input[type=text]{width:100%;background:#0d0d1a;border:1px solid #252550;border-radius:6px;padding:.65rem .9rem;color:#ddd;font-size:.9rem;outline:none;transition:border-color .15s}
+input[type=password]:focus,input[type=text]:focus{border-color:#a78bfa}
 .login-btn{margin-top:1.2rem;width:100%;background:#6d28d9;border:none;border-radius:6px;padding:.7rem;color:#fff;font-size:.9rem;font-weight:600;cursor:pointer;transition:background .15s}
 .login-btn:hover{background:#7c3aed}
 .err{margin-top:1rem;background:#2a1a1a;border:1px solid #5a1a1a;border-radius:6px;padding:.6rem .9rem;font-size:.82rem;color:#f87171}
@@ -226,7 +262,7 @@ local function nav_html(active)
     local p = {}
     p[#p+1] = '<header><div class="hdr-top"><div><h1>&#128218; KOReader Sync</h1>'
     p[#p+1] = '<div class="sub">Admin Dashboard</div></div>'
-    if admin_password() then
+    if admin_enabled() then
         p[#p+1] = '<a href="/admin/logout" class="logout">Sign out</a>'
     end
     p[#p+1] = '</div><nav>'
@@ -251,8 +287,10 @@ local function render_login(err_msg)
         .. '<div class="login-card"><h1>&#128218; KOReader Sync</h1>'
         .. '<div class="sub">Admin Dashboard</div>'
         .. '<form method="POST" action="/admin">'
-        .. '<label for="pw">Password</label>'
-        .. '<input type="password" id="pw" name="password" autofocus>'
+        .. '<label for="un">Username</label>'
+        .. '<input type="text" id="un" name="username" autocomplete="username" autofocus>'
+        .. '<label for="pw" style="margin-top:1rem">Password</label>'
+        .. '<input type="password" id="pw" name="password" autocomplete="current-password">'
         .. '<button type="submit" class="login-btn">Sign in</button>'
         .. err_html .. '</form></div></body></html>'
 end
@@ -516,18 +554,36 @@ end
 -- ── Controller actions ───────────────────────────────────────────────────
 
 function AdminController:login()
-    local pwd = admin_password()
-    if not pwd then
+    if not admin_enabled() then
         return ngx.redirect("/admin", 302)
     end
+
+    local redis = Redis:new()
+    local ip = ngx.var.remote_addr
+
+    -- Check lockout
+    if is_locked_out(redis, ip) then
+        ngx.log(ngx.WARN, "admin login blocked (locked out): ", ip)
+        Redis.release()
+        ngx.header.content_type = "text/html; charset=utf-8"
+        ngx.say(render_login("Too many failed attempts. Try again in 5 minutes."))
+        return ngx.exit(429)
+    end
+
     local args = ngx.ctx.form_args
-    if args and args.password == pwd then
-        set_auth_cookie(pwd)
+    if args and args.username == admin_username() and args.password == admin_password() then
+        clear_failed_attempts(redis, ip)
+        Redis.release()
+        set_auth_cookie(admin_password())
         return ngx.redirect("/admin", 302)
     end
-    ngx.log(ngx.WARN, "admin login failed from ", ngx.var.remote_addr)
+
+    -- Failed attempt
+    record_failed_attempt(redis, ip)
+    ngx.log(ngx.WARN, "admin login failed from ", ip)
+    Redis.release()
     ngx.header.content_type = "text/html; charset=utf-8"
-    ngx.say(render_login("Incorrect password."))
+    ngx.say(render_login("Incorrect username or password."))
     return ngx.exit(200)
 end
 
@@ -537,9 +593,9 @@ function AdminController:logout()
 end
 
 function AdminController:dashboard()
-    if not admin_password() then
+    if not admin_enabled() then
         ngx.header.content_type = "text/html; charset=utf-8"
-        ngx.say(render_login("Admin dashboard is disabled. Set the ADMIN_PASSWORD environment variable to enable it."))
+        ngx.say(render_login("Admin dashboard is disabled. Set ADMIN_USERNAME and ADMIN_PASSWORD environment variables to enable it."))
         return ngx.exit(403)
     end
     if not is_authenticated() then

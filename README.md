@@ -42,8 +42,7 @@ docker run -d -p 7200:7200 \
     --name=kosync jacosverksted/koreader-sync-dashboard
 ```
 
-To enable the admin dashboard, add `-e ADMIN_PASSWORD=yourpassword` to the
-command above. Change `yourpassword` to a strong password of your own.
+To enable the admin dashboard, add `-e ADMIN_USERNAME=yourusername -e ADMIN_PASSWORD=yourpassword` to the command above. Change `yourusername` and `yourpassword` to your own credentials.
 
 ### Docker Compose
 
@@ -51,8 +50,8 @@ command above. Change `yourpassword` to a strong password of your own.
 docker compose up -d
 ```
 
-See `docker-compose.yml` — uncomment and set the `ADMIN_PASSWORD` environment
-variable before starting.
+See `docker-compose.yml` — uncomment and set the `ADMIN_USERNAME` and
+`ADMIN_PASSWORD` environment variables before starting.
 
 ### Verify it works
 
@@ -69,7 +68,8 @@ returns `503 {"state":"FAIL"}`.
 | Environment Variable | Default | Description |
 |---|---|---|
 | `ENABLE_USER_REGISTRATION` | `true` | Initial default for new sign-ups. Can be toggled at runtime via the admin Settings tab |
-| `ADMIN_PASSWORD` | *(unset)* | Password for the admin dashboard. **Required** — the dashboard is disabled until this is set |
+| `ADMIN_USERNAME` | *(unset)* | Username for the admin dashboard. **Required** — the dashboard is disabled until both this and `ADMIN_PASSWORD` are set |
+| `ADMIN_PASSWORD` | *(unset)* | Password for the admin dashboard. **Required** — the dashboard is disabled until both this and `ADMIN_USERNAME` are set |
 
 ## Admin Dashboard
 
@@ -143,8 +143,9 @@ All endpoints require the header `Accept: application/vnd.koreader.v1+json`
 - **Rate limited** — 10 requests/second per IP with burst allowance of 20.
 - **Security headers** — `X-Frame-Options: DENY`,
   `X-Content-Type-Options: nosniff`, `Referrer-Policy`.
-- **Admin access** — protected by a separate password with HttpOnly,
-  SameSite=Strict cookies.
+- **Admin access** — protected by username + password with HttpOnly,
+  SameSite=Strict cookies. Brute-force protection locks out an IP for
+  5 minutes after 5 failed attempts.
 
 ## Docker Logging
 
@@ -172,8 +173,9 @@ changes needed.
   action required.
 - **Downgrading after upgrade** will lock out any user whose password was
   already migrated to a hash, since the old code expects plaintext.
-- **`ADMIN_PASSWORD` is required** for the admin dashboard. Set it in your
-  environment or `docker-compose.yml`. The dashboard is disabled without it.
+- **`ADMIN_USERNAME` and `ADMIN_PASSWORD` are required** for the admin
+  dashboard. Set both in your environment or `docker-compose.yml`. The
+  dashboard is disabled without them.
 - **New log volume.** Mount `./logs/app:/app/koreader-sync-server/logs` to
   persist nginx access and application logs. Optional — logs stay inside the
   container if not mounted.
@@ -193,7 +195,8 @@ docker run -d -p 7200:7200 \
 ```
 
 Or with Docker Compose, update your `docker-compose.yml` to add the
-`ADMIN_PASSWORD` environment variable and the logs volume, then:
+`ADMIN_USERNAME` and `ADMIN_PASSWORD` environment variables and the logs
+volume, then:
 
 ```bash
 docker compose up -d

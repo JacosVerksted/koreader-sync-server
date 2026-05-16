@@ -7,6 +7,7 @@ services:
       - 7200:7200
     environment:
       - ENABLE_USER_REGISTRATION=true
+      # - ADMIN_USERNAME=admin
       # - ADMIN_PASSWORD=your-secret-here
     volumes:
       - ./logs/app:/app/koreader-sync-server/logs
