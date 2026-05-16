@@ -1,6 +1,6 @@
 services:
   kosync:
-    build: .
+    image: jacosverksted/koreader-sync-dashboard:latest
     container_name: kosync
     restart: unless-stopped
     ports:
@@ -9,6 +9,6 @@ services:
       - ENABLE_USER_REGISTRATION=true
       # - ADMIN_PASSWORD=your-secret-here
     volumes:
-      - /mnt/cache/appdata/koreader-sync-server/test/logs/app:/app/koreader-sync-server/logs
-      - /mnt/cache/appdata/koreader-sync-server/test/logs/redis:/var/log/redis
-      - /mnt/cache/appdata/koreader-sync-server/test/data/redis:/var/lib/redis
+      - ./logs/app:/app/koreader-sync-server/logs
+      - ./logs/redis:/var/log/redis
+      - ./data/redis:/var/lib/redis
