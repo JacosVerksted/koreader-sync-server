@@ -36,12 +36,14 @@ KOReader.
 mkdir -p ./logs/{redis,app} ./data/redis
 
 docker run -d -p 7200:7200 \
-    -e ADMIN_PASSWORD=your-secret \
     -v $(pwd)/logs/app:/app/koreader-sync-server/logs \
     -v $(pwd)/logs/redis:/var/log/redis \
     -v $(pwd)/data/redis:/var/lib/redis \
     --name=kosync jacosverksted/koreader-sync-dashboard
 ```
+
+To enable the admin dashboard, add `-e ADMIN_PASSWORD=yourpassword` to the
+command above.
 
 ### Docker Compose
 
@@ -184,7 +186,6 @@ docker stop kosync && docker rm kosync
 
 # Start with the same Redis data volume and add new config
 docker run -d -p 7200:7200 \
-    -e ADMIN_PASSWORD=your-secret \
     -v /path/to/existing/redis:/var/lib/redis \
     -v $(pwd)/logs/app:/app/koreader-sync-server/logs \
     -v $(pwd)/logs/redis:/var/log/redis \
