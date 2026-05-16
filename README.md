@@ -43,7 +43,7 @@ docker run -d -p 7200:7200 \
 ```
 
 To enable the admin dashboard, add `-e ADMIN_PASSWORD=yourpassword` to the
-command above.
+command above. Change `yourpassword` to a strong password of your own.
 
 ### Docker Compose
 
